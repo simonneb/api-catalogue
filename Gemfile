@@ -11,5 +11,7 @@ gem 'tzinfo-data', platforms: [:mswin, :mingw, :jruby]
 # Include the tech docs gem
 gem 'govuk_tech_docs'
 
+gem 'sqlite3'
+
 # For helping with deployment
 gem 'middleman-gh-pages'
