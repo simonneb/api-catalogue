@@ -2,9 +2,10 @@ require 'sqlite3'
 require 'csv'
 
 def schema
-    query = <<-SQL
+  query = <<-SQL
     CREATE TABLE catalogue (
-      url text PRIMARY KEY,
+      id text PRIMARY KEY,
+      url text UNIQUE,
       name text NOT NULL,
       description text NOT NULL,
       documentation text NOT NULL,
@@ -15,70 +16,52 @@ def schema
       startDate date,
       endDate date
     );
-    SQL
+  SQL
 
-    query
+  query
 end
 
-begin
-    db = SQLite3::Database.new ":memory:"
-    db.execute(schema)
+def load_catalogue(tx, path)
+  tx.execute(schema)
 
-    catalogue = CSV.read('unpack_scripts/apic.csv', headers: true).map(&:to_h)
+  catalogue = CSV.read(path, headers: true).map(&:to_h)
 
-    # insert_query = <<-SQL
-    # INSERT INTO catalogue VALUES (
-    #   @url,
-    #   @name,
-    #   @description,
-    #   @documentation,
-    #   @license,
-    #   @maintainer,
-    #   @provider,
-    #   @areaServed,
-    #   @startDate,
-    #   @endDate
-    # );
-    # SQL
-    insert_query = <<-SQL
-    INSERT INTO catalogue (url) VALUES (
-      @url
+  insert_query = <<-SQL
+    INSERT INTO catalogue VALUES (
+      :id,
+      :url,
+      :name,
+      :description,
+      :documentation,
+      :license,
+      :maintainer,
+      :provider,
+      :areaServed,
+      :startDate,
+      :endDate
     );
-    SQL
+  SQL
+  stmt = tx.prepare(insert_query)
 
-    catalogue.each do |record|
-      db.execute(insert_query, {'url'=> record['url']})
-    end
-	
-	#dateadded = row['dateadded']
-	#dateupdated = row['dateupdated']
-    #uuid = row['uuid']
-    #url = row['url']
-    #name = row['name']
-    #documentation = row['documentation']
-    #license = row['license']
-    #maintainer = row['maintainer']
-    #provider = row['provider']
-    #areaServed = row['areaServed']
-    #startDate = row['startDate']
-    #endDate = row['provider']
-    #organisation = row['organisation']
-	#typeof = row['endDate']
-	
-##	fields = File.join("#{dateadded}", "#{dateupdated}", "#{uuid}", "#{url}", "#{name}", "#{documentation}","#{license}", "#{maintainer}", "#{provider}", "#{areaServed}", "#{startDate}", "#{endDate}", "#{organisation}", "#{typeof}")
-	
-	#db.execute("INSERT INTO apic (dateadded, dateupdated, uuid, url, name, documentation, license, maintainer, provider, areaServed, startDate, endDate, organisation, typeof), VALUES (""#{dateadded}", "#{dateupdated}", "#{uuid}", "#{url}", "#{name}", "#{documentation}","#{license}", "#{maintainer}", "#{provider}", "#{areaServed}", "#{startDate}", "#{endDate}", "#{organisation}", "#{typeof}" ")")
-    
-    #id = db.last_insert_row_id
-    #puts "The last id of the inserted row is #{id}"
-        
-    #end
-        
-rescue SQLite3::Exception => e 
-    
-    puts "Exception occurred"
-    puts e
-    
-ensure
-    db.close if db
+  catalogue.each do |record|
+    stmt.execute(record)
+  end
+
+  count = tx.query("SELECT count(*) FROM catalogue").next
+
+  puts count
 end
+
+def load_all
+  db = SQLite3::Database.new ":memory:"
+  db.transaction do |tx|
+    load_catalogue(tx, "data/catalogue.csv")
+  end
+rescue SQLite3::Exception => e 
+  puts "Exception occurred"
+  puts e
+end
+
+
+# Main
+load_all
